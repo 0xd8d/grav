@@ -21,6 +21,7 @@ export default function RootLayout() {
         <Stack.Screen name="templates/new" options={{ title: 'New Template' }} />
         <Stack.Screen name="workout/logger" options={{ title: 'Workout' }} />
         <Stack.Screen name="workout/repeat" options={{ title: 'Repeat Workout' }} />
+        <Stack.Screen name="workout/pick-exercise" options={{ title: 'Pick Exercise' }} />
       </Stack>
     </GestureHandlerRootView>
   );

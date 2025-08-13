@@ -69,10 +69,7 @@ export default function TemplatePicker() {
 }
 
 function templateSubtitle(t: WorkoutTemplate): string {
-  const exercises = t.blocks
-    .filter((b) => b.type === 'exercise' && b.exerciseId)
-    .map((b) => b.exerciseId)
-    .length;
+  const exercises = t.blocks.filter((b) => b.type === 'exercise').length;
   const duration = t.estimatedDuration_min ? `${t.estimatedDuration_min} min` : '—';
   const last = t.lastUsedAt ? timeAgo(new Date(t.lastUsedAt)) : 'Never';
   return `${exercises} exercises  •  ${duration}  •  Last: ${last}`;
