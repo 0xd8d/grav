@@ -5,6 +5,8 @@ import { useNavigation, useRouter } from 'expo-router';
 import { generateId, loadTemplates, saveTemplates } from '../../src/storage/storage';
 import { TemplateBlock, TemplateSet, WorkoutTemplate } from '../../src/models/types';
 import { Ionicons } from '@expo/vector-icons';
+import { EXERCISES } from '../../src/data/exercises';
+import { pickerEvents } from '../../src/utils/events';
 
 export default function NewTemplate() {
   const router = useRouter();
@@ -13,6 +15,7 @@ export default function NewTemplate() {
   const [defaultRest, setDefaultRest] = useState<string>('');
   const [note, setNote] = useState('');
   const [blocks, setBlocks] = useState<TemplateBlock[]>([]);
+  const [pendingBlockId, setPendingBlockId] = useState<string | null>(null);
 
   useEffect(() => {
     navigation.setOptions({
@@ -24,6 +27,14 @@ export default function NewTemplate() {
       headerTitle: name ? name : 'New Template',
     });
   }, [navigation, name]);
+
+  useEffect(() => {
+    const unsubscribe = pickerEvents.on('exercisePicked', ({ exerciseId, context, blockId }) => {
+      if (context !== 'template' || !blockId) return;
+      setBlocks((prev) => prev.map((b) => (b.id === blockId ? { ...b, exerciseId } : b)));
+    });
+    return unsubscribe;
+  }, []);
 
   function addExerciseBlock() {
     const block: TemplateBlock = {
@@ -39,6 +50,11 @@ export default function NewTemplate() {
 
   function defaultSets(): TemplateSet[] {
     return [1, 2, 3].map(() => ({ id: generateId('ts'), targetWeight_kg: null, targetReps: null, note: null }));
+  }
+
+  function onPickExercise(blockId: string) {
+    setPendingBlockId(blockId);
+    router.push({ pathname: '/workout/pick-exercise', params: { returnTo: '/templates/new', blockId, context: 'template' } });
   }
 
   async function onSave() {
@@ -98,18 +114,28 @@ export default function NewTemplate() {
         <Text style={{ color: colors.accent, marginLeft: 8, fontWeight: '600' }}>Add Exercise</Text>
       </TouchableOpacity>
 
-      {blocks.map((b) => (
-        <View key={b.id} style={{ marginTop: 16, padding: 12, backgroundColor: colors.surfaceAlt, borderRadius: 10, borderWidth: 1, borderColor: colors.divider }}>
-          <Text style={{ color: colors.textPrimary, fontWeight: '700', marginBottom: 8 }}>Exercise</Text>
-          <Text style={{ color: colors.textSecondary, marginBottom: 8 }}>Select exercise and set targets in a later iteration.</Text>
-          {b.sets.map((s) => (
-            <View key={s.id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 }}>
-              <Text style={{ color: colors.textSecondary }}>kg × reps</Text>
-              <Text style={{ color: colors.textSecondary }}>— × —</Text>
+      {blocks.map((b) => {
+        const selected = EXERCISES.find((e) => e.id === b.exerciseId);
+        return (
+          <View key={b.id} style={{ marginTop: 16, padding: 12, backgroundColor: colors.surfaceAlt, borderRadius: 10, borderWidth: 1, borderColor: colors.divider }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ color: colors.textPrimary, fontWeight: '700', marginBottom: 8 }}>Exercise</Text>
+              <TouchableOpacity onPress={() => onPickExercise(b.id)}>
+                <Text style={{ color: colors.accent, fontWeight: '600' }}>{selected ? 'Change' : 'Pick'} Exercise</Text>
+              </TouchableOpacity>
             </View>
-          ))}
-        </View>
-      ))}
+            <Text style={{ color: selected ? colors.textPrimary : colors.textSecondary, marginBottom: 8 }}>
+              {selected ? selected.name : 'No exercise selected'}
+            </Text>
+            {b.sets.map((s) => (
+              <View key={s.id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 }}>
+                <Text style={{ color: colors.textSecondary }}>kg × reps</Text>
+                <Text style={{ color: colors.textSecondary }}>— × —</Text>
+              </View>
+            ))}
+          </View>
+        );
+      })}
 
       <View style={{ height: 40 }} />
     </ScrollView>

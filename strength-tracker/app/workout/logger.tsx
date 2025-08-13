@@ -6,15 +6,35 @@ import { WorkoutExercise, WorkoutSession, WorkoutSet, WorkoutTemplate } from '..
 import { epley1RM, secondsToMmSs } from '../../src/utils/format';
 import { generateId, getLastRestSeconds, loadSessions, loadTemplates, saveSessions, setLastRestSeconds, touchTemplateLastUsed } from '../../src/storage/storage';
 import { Ionicons } from '@expo/vector-icons';
+import { EXERCISES } from '../../src/data/exercises';
+import { pickerEvents } from '../../src/utils/events';
 
 export default function Logger() {
-  const { templateId, repeat } = useLocalSearchParams<{ templateId?: string; repeat?: string }>();
+  const { templateId, repeat, pickExercise } = useLocalSearchParams<{ templateId?: string; repeat?: string; pickExercise?: string }>();
   const navigation = useNavigation();
   const router = useRouter();
   const [session, setSession] = useState<WorkoutSession>(() => createBlankSession(templateId || null));
   const [timerSeconds, setTimerSeconds] = useState<number>(0);
   const [timerTarget, setTimerTarget] = useState<number>(90);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = pickerEvents.on('exercisePicked', ({ exerciseId, context }) => {
+      if (context !== 'logger') return;
+      const exercise = EXERCISES.find((e) => e.id === exerciseId);
+      if (!exercise) return;
+      const ex: WorkoutExercise = {
+        id: generateId('we'),
+        exerciseId: exercise.id,
+        nameSnapshot: exercise.name,
+        restSeconds: null,
+        note: null,
+        sets: [newSet(), newSet(), newSet()],
+      };
+      setSession((s) => ({ ...s, exercises: [...s.exercises, ex] }));
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     navigation.setOptions({
@@ -55,6 +75,24 @@ export default function Logger() {
   }, [templateId, repeat]);
 
   useEffect(() => {
+    if (pickExercise) {
+      const exercise = EXERCISES.find((e) => e.id === pickExercise);
+      if (exercise) {
+        const ex: WorkoutExercise = {
+          id: generateId('we'),
+          exerciseId: exercise.id,
+          nameSnapshot: exercise.name,
+          restSeconds: null,
+          note: null,
+          sets: [newSet(), newSet(), newSet()],
+        };
+        setSession((s) => ({ ...s, exercises: [...s.exercises, ex] }));
+        router.setParams({ pickExercise: undefined as unknown as string });
+      }
+    }
+  }, [pickExercise]);
+
+  useEffect(() => {
     const save = async () => {
       const existing = await loadSessions();
       const idx = existing.findIndex((s) => s.id === session.id);
@@ -65,15 +103,7 @@ export default function Logger() {
   }, [session]);
 
   function addExercise() {
-    const ex: WorkoutExercise = {
-      id: generateId('we'),
-      exerciseId: 'custom',
-      nameSnapshot: 'New Exercise',
-      restSeconds: null,
-      note: null,
-      sets: [newSet(), newSet(), newSet()],
-    };
-    setSession((s) => ({ ...s, exercises: [...s.exercises, ex] }));
+    router.push({ pathname: '/workout/pick-exercise', params: { returnTo: '/workout/logger', context: 'logger' } });
   }
 
   function newSet(): WorkoutSet {
@@ -302,7 +332,7 @@ function buildSessionFromTemplate(tpl: WorkoutTemplate): WorkoutSession {
       .map((b, idx) => ({
         id: generateId('we'),
         exerciseId: b.exerciseId ?? 'unknown',
-        nameSnapshot: `Exercise ${idx + 1}`,
+        nameSnapshot: EXERCISES.find((e) => e.id === b.exerciseId)?.name ?? `Exercise ${idx + 1}`,
         restSeconds: b.restSeconds,
         note: b.note,
         sets: b.sets.map(() => ({ id: generateId('ws'), kg: null, reps: null, isWarmup: false, completedAt: null })),
